@@ -104,8 +104,8 @@
   .score .caption { margin-top: var(--s2); font-size: 12.5px; color: var(--muted); }
 
   /* KPI */
-  .kpi-grid { grid-template-columns: repeat(4, 1fr); }
-  .kpi { position: relative; background: var(--panel-2); border: 1px solid var(--line); border-radius: 18px; padding: 22px 20px;
+  .kpi-grid { display: flex; flex-wrap: wrap; justify-content: center; }
+  .kpi { flex: 1 1 calc(25% - 18px); min-width: 220px; position: relative; background: var(--panel-2); border: 1px solid var(--line); border-radius: 18px; padding: 22px 20px;
     backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
     transition: transform .2s cubic-bezier(.2,.7,.3,1), box-shadow .2s ease, border-color .2s ease; overflow: hidden; }
   .kpi:hover { transform: translateY(-5px); border-color: rgba(20,160,143,0.42); box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 22px 46px rgba(12,92,134,0.20); }
@@ -298,7 +298,7 @@
     <div class="section-label reveal" style="animation-delay:.1s;margin-top:24px">Key Metrics</div>
     <div class="grid kpi-grid reveal" style="animation-delay:.12s">
       <div class="kpi" data-k="leads"><div class="kpi-head"><span class="kpi-label">New Leads</span><span class="badge" data-badge></span></div><div class="kpi-value" data-val></div><div class="kpi-bottom"><span class="kpi-prev" data-prev></span><svg class="kpi-spark" viewBox="0 0 84 32" preserveAspectRatio="none"><path data-spark fill="none" stroke-width="2"/></svg></div></div>
-      <div class="kpi" data-k="dials"><div class="kpi-head"><span class="kpi-label">Outbound Dials</span><span class="badge" data-badge></span></div><div class="kpi-value" data-val></div><div class="kpi-bottom"><span class="kpi-prev" data-prev></span><svg class="kpi-spark" viewBox="0 0 84 32" preserveAspectRatio="none"><path data-spark fill="none" stroke-width="2"/></svg></div></div>
+      <div class="kpi" data-k="dials"><div class="kpi-head"><span class="kpi-label">Dials</span><span class="badge" data-badge></span></div><div class="kpi-value" data-val></div><div class="kpi-bottom"><span class="kpi-prev" data-prev></span><svg class="kpi-spark" viewBox="0 0 84 32" preserveAspectRatio="none"><path data-spark fill="none" stroke-width="2"/></svg></div></div>
       <div class="kpi" data-k="pickups"><div class="kpi-head"><span class="kpi-label">Pickups</span><span class="badge" data-badge></span></div><div class="kpi-value" data-val></div><div class="kpi-bottom"><span class="kpi-prev" data-prev></span><svg class="kpi-spark" viewBox="0 0 84 32" preserveAspectRatio="none"><path data-spark fill="none" stroke-width="2"/></svg></div></div>
       <div class="kpi" data-k="convos"><div class="kpi-head"><span class="kpi-label">Conversations</span><span class="badge" data-badge></span></div><div class="kpi-value" data-val></div><div class="kpi-bottom"><span class="kpi-prev" data-prev></span><svg class="kpi-spark" viewBox="0 0 84 32" preserveAspectRatio="none"><path data-spark fill="none" stroke-width="2"/></svg></div></div>
       <div class="kpi" data-k="booked"><div class="kpi-head"><span class="kpi-label">Appointments</span><span class="badge" data-badge></span></div><div class="kpi-value" data-val></div><div class="kpi-bottom"><span class="kpi-prev" data-prev></span><svg class="kpi-spark" viewBox="0 0 84 32" preserveAspectRatio="none"><path data-spark fill="none" stroke-width="2"/></svg></div></div>
@@ -567,18 +567,21 @@ window.CLIENT_DATA = {
   function renderFunnel(){
     var d=DATA[selected], closed=(selected in CLOSED)?CLOSED[selected]:null;
     var stages=[
-      {name:'New Leads', sub:'top of funnel', val:d.leads, w:100, dpt:0},
-      {name:'Outbound Calls', sub:'dials placed', val:d.dials, w:90, dpt:1},
-      {name:'Pickups', sub:'calls answered', val:d.pickups, w:80, dpt:2},
-      {name:'Conversations', sub:'live discussions', val:d.convos, w:70, dpt:3},
-      {name:'Appointments', sub:'booked', val:d.booked, w:60, dpt:4},
-      {name:'Closed Deals', sub:closed==null?'not tracked yet':'won', val:closed, w:50, dpt:5, muted:closed==null}
+      {name:'New Leads', sub:'top of funnel', val:d.leads, dpt:0},
+      {name:'Outbound Calls', sub:'dials placed', val:d.dials, dpt:1},
+      {name:'Pickups', sub:'calls answered', val:d.pickups, dpt:2},
+      {name:'Conversations', sub:'live discussions', val:d.convos, dpt:3},
+      {name:'Appointments', sub:'booked', val:d.booked, dpt:4},
+      {name:'Closed Deals', sub:closed==null?'not tracked yet':'won', val:closed, dpt:5, muted:closed==null}
     ];
+    if((CFG.hide||[]).indexOf('newLeads')>-1) stages.shift(); // no lead tracking → start at Dials
+    var n=stages.length;
+    stages.forEach(function(s,i){ s.w = n>1 ? (100 - i*(50/(n-1))) : 100; });
     var html='';
     stages.forEach(function(s,i){
       if(i>0){
         var prev=stages[i-1], conn;
-        if(i===1){ // leads -> calls = expansion (multiplier)
+        if(prev.name==='New Leads'){ // leads -> calls = expansion (multiplier)
           conn = prev.val ? (s.val/prev.val).toFixed(1)+'× dials/lead' : '—';
           html+='<div class="vconn"><span class="arrow">▼</span><div class="chips"><span class="mult">'+conn+'</span></div></div>';
         } else if(s.val==null || prev.val==null){
@@ -733,6 +736,7 @@ window.CLIENT_DATA = {
     var HIDE = CFG.hide || [], map = { leadSource:'panelLeadSource', heatmap:'panelHeatmap', timeline:'panelTimeline' };
     HIDE.forEach(function(k){ var el=document.getElementById(map[k]); if(el) el.remove(); });
     if(HIDE.indexOf('leadSource')>-1){ var r=document.getElementById('rowSF'); if(r) r.style.gridTemplateColumns='1fr'; }
+    if(HIDE.indexOf('newLeads')>-1){ var lc=document.querySelector('.kpi[data-k="leads"]'); if(lc) lc.remove(); }
   })();
   renderHeatmap();
   renderChart(true);
